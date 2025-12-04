@@ -139,14 +139,14 @@
                 #screenshot-image {
                     max-width: 100%;
                     display: block;
-                    pointer-events: none; /* alle input naar canvas */
+                    user-select: none;
                 }
                 #screenshot-draw-canvas {
                     position: absolute;
                     left: 0;
                     top: 0;
                     cursor: crosshair;
-                    z-index: 2; /* boven de image */
+                    z-index: 2;
                 }
                 .hint-text {
                     font-size: 12px;
@@ -155,6 +155,7 @@
                 }
                 .tool-selector {
                     margin-top: 8px;
+                    margin-bottom: 8px;
                     display: flex;
                     gap: 8px;
                     align-items: center;
@@ -222,9 +223,10 @@
         const toolPencilBtn = document.getElementById('tool-pencil');
         const toolEraserBtn = document.getElementById('tool-eraser');
 
-        let currentTool = 'pencil'; // 'pencil' of 'eraser'
-        let baseScreenshotDataUrl = null;   // originele screenshot
-        let finalScreenshotDataUrl = null;  // screenshot + tekeningen
+        let currentTool = 'pencil';
+        let baseScreenshotDataUrl = null;
+        let finalScreenshotDataUrl = null;
+        let drawingInitialized = false;
 
         // popup open/close
         openBtn.onclick = () => {
@@ -270,6 +272,9 @@
 
         // Tekenen op de canvas
         function setupDrawing() {
+            if (drawingInitialized) return;
+            drawingInitialized = true;
+
             const ctx = drawCanvas.getContext('2d');
             let drawing = false;
             let lastX = 0;
@@ -299,6 +304,7 @@
                 const pos = getPos(e);
 
                 ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
 
                 if (currentTool === 'pencil') {
                     ctx.globalCompositeOperation = 'source-over';
@@ -307,7 +313,7 @@
                 } else if (currentTool === 'eraser') {
                     ctx.globalCompositeOperation = 'destination-out';
                     ctx.strokeStyle = 'rgba(0,0,0,1)';
-                    ctx.lineWidth = 10;
+                    ctx.lineWidth = 20;
                 }
 
                 ctx.beginPath();
@@ -333,13 +339,9 @@
             drawCanvas.addEventListener('touchstart', startDrawing, { passive: false });
             drawCanvas.addEventListener('touchmove', draw, { passive: false });
             drawCanvas.addEventListener('touchend', stopDrawing);
-
-            // Zorg dat image niet gesleept wordt
-            screenshotImg.addEventListener('dragstart', (e) => e.preventDefault());
-            screenshotImg.addEventListener('mousedown', (e) => e.preventDefault());
         }
 
-        // Screenshot maken (zonder popup)
+        // Screenshot maken
         async function makeScreenshot() {
             try {
                 const html2canvas = await loadHtml2Canvas();
@@ -351,11 +353,24 @@
 
                 screenshotImg.src = baseScreenshotDataUrl;
                 screenshotImg.onload = () => {
-                    drawCanvas.width = screenshotImg.clientWidth;
-                    drawCanvas.height = screenshotImg.clientHeight;
+                    // Wacht tot image volledig geladen is
+                    const imgWidth = screenshotImg.offsetWidth;
+                    const imgHeight = screenshotImg.offsetHeight;
+                    
+                    // Zet canvas exact over de image
+                    drawCanvas.width = imgWidth;
+                    drawCanvas.height = imgHeight;
+                    drawCanvas.style.width = imgWidth + 'px';
+                    drawCanvas.style.height = imgHeight + 'px';
+                    
                     screenshotWrapper.style.display = 'block';
+                    
+                    // Clear canvas
                     const ctx = drawCanvas.getContext('2d');
                     ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+                    
+                    // Initialiseer tekenen
+                    setupDrawing();
                 };
             } catch (err) {
                 console.error('Fout bij het maken van de screenshot:', err);
@@ -377,9 +392,9 @@
                     const ctx = finalCanvas.getContext('2d');
 
                     // Basis screenshot
-                    ctx.drawImage(img, 0, 0, img.width, img.height);
+                    ctx.drawImage(img, 0, 0);
 
-                    // Tekenlaag schalen naar volledige resolutie
+                    // Tekenlaag eroverheen (schalen naar originele grootte)
                     if (drawCanvas.width > 0 && drawCanvas.height > 0) {
                         ctx.drawImage(drawCanvas, 0, 0, img.width, img.height);
                     }
@@ -395,10 +410,6 @@
             screenshotBtn.disabled = true;
             screenshotBtn.textContent = 'Screenshot maken...';
             await makeScreenshot();
-            if (drawCanvas && !drawCanvas.dataset._init) {
-                setupDrawing();
-                drawCanvas.dataset._init = '1';
-            }
             screenshotBtn.disabled = false;
             screenshotBtn.textContent = 'Maak screenshot van pagina';
         });
@@ -441,6 +452,7 @@
                 if (response.status === 201) {
                     alert('Bedankt! Feedback succesvol ontvangen door de server.');
                     resetModal();
+                    drawingInitialized = false;
                 } else {
                     const errorData = await response.json().catch(() => ({}));
                     alert(`Fout bij verzenden (${response.status}): ${errorData.msg || 'Serverfout'}`);
