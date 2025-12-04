@@ -71,6 +71,9 @@
                     opacity: 0.6;
                     cursor: default;
                 }
+                #${WIDGET_ID} button:hover:not(:disabled) {
+                    background-color: #2563EB;
+                }
                 .feedback-modal {
                     display: none;
                     position: fixed;
@@ -126,7 +129,7 @@
                     border: 1px solid #ddd;
                     border-radius: 4px;
                     padding: 8px;
-                    max-height: 350px;
+                    max-height: 400px;
                     overflow: auto;
                     display: none;
                     background: #fafafa;
@@ -140,6 +143,7 @@
                     max-width: 100%;
                     display: block;
                     user-select: none;
+                    -webkit-user-select: none;
                 }
                 #screenshot-draw-canvas {
                     position: absolute;
@@ -155,23 +159,40 @@
                 }
                 .tool-selector {
                     margin-top: 8px;
-                    margin-bottom: 8px;
+                    margin-bottom: 12px;
                     display: flex;
                     gap: 8px;
                     align-items: center;
-                    font-size: 12px;
+                    font-size: 13px;
                     color: #333;
+                    font-weight: 500;
                 }
                 .tool-selector button {
                     background-color: #e5e7eb;
-                    color: #111827;
-                    padding: 4px 10px;
-                    font-size: 12px;
-                    box-shadow: none;
+                    color: #374151;
+                    padding: 6px 14px;
+                    font-size: 13px;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                    border-radius: 6px;
+                    font-weight: 500;
+                    transition: all 0.2s;
+                }
+                .tool-selector button:hover {
+                    background-color: #d1d5db;
                 }
                 .tool-selector button.active {
                     background-color: #3B82F6;
                     color: #ffffff;
+                    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.4);
+                }
+                .canvas-hint {
+                    font-size: 11px;
+                    color: #6b7280;
+                    margin-top: 6px;
+                    padding: 4px 8px;
+                    background: #f3f4f6;
+                    border-radius: 4px;
+                    display: inline-block;
                 }
             </style>
 
@@ -186,25 +207,26 @@
 
                     <textarea id="feedback-text" placeholder="Typ hier je opmerking..."></textarea>
 
-                    <button id="screenshot-btn" type="button">Maak screenshot van pagina</button>
+                    <button id="screenshot-btn" type="button">📸 Maak screenshot van pagina</button>
                     <div class="hint-text">De screenshot bevat de pagina zonder dit venster.</div>
 
                     <div id="screenshot-preview-wrapper">
                         <div class="tool-selector">
-                            <span>Tekentool:</span>
-                            <button id="tool-pencil" type="button" class="active">Potlood</button>
-                            <button id="tool-eraser" type="button">Gum</button>
+                            <span>✏️ Teken gereedschap:</span>
+                            <button id="tool-pencil" type="button" class="active">✏️ Potlood</button>
+                            <button id="tool-eraser" type="button">🧹 Gum</button>
                         </div>
                         <div class="hint-text">
-                            Teken op de screenshot om extra aan te geven wat belangrijk is.
+                            Klik en sleep om te tekenen op de screenshot. Gebruik de gum om tekeningen te verwijderen.
                         </div>
                         <div id="screenshot-preview-container">
                             <img id="screenshot-image" alt="Screenshot preview" />
                             <canvas id="screenshot-draw-canvas"></canvas>
                         </div>
+                        <div class="canvas-hint">💡 Tip: Sleep met je muis over de screenshot om te tekenen</div>
                     </div>
 
-                    <button id="send-feedback-btn" type="button">Verstuur Feedback</button>
+                    <button id="send-feedback-btn" type="button">📤 Verstuur Feedback</button>
                 </div>
             </div>
         `;
@@ -249,6 +271,7 @@
             baseScreenshotDataUrl = null;
             finalScreenshotDataUrl = null;
             screenshotWrapper.style.display = 'none';
+            drawingInitialized = false;
             if (drawCanvas) {
                 const ctx = drawCanvas.getContext('2d');
                 ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
@@ -258,24 +281,38 @@
         // tool switch
         function setTool(tool) {
             currentTool = tool;
+            console.log('Tool geselecteerd:', tool);
+            
             if (tool === 'pencil') {
                 toolPencilBtn.classList.add('active');
                 toolEraserBtn.classList.remove('active');
+                drawCanvas.style.cursor = 'crosshair';
             } else {
                 toolEraserBtn.classList.add('active');
                 toolPencilBtn.classList.remove('active');
+                drawCanvas.style.cursor = 'grab';
             }
         }
 
-        toolPencilBtn.addEventListener('click', () => setTool('pencil'));
-        toolEraserBtn.addEventListener('click', () => setTool('eraser'));
+        toolPencilBtn.addEventListener('click', () => {
+            setTool('pencil');
+        });
+        
+        toolEraserBtn.addEventListener('click', () => {
+            setTool('eraser');
+        });
 
         // Tekenen op de canvas
         function setupDrawing() {
-            if (drawingInitialized) return;
+            if (drawingInitialized) {
+                console.log('Tekenen al geïnitialiseerd');
+                return;
+            }
+            
             drawingInitialized = true;
+            console.log('Tekenen initialiseren...');
 
-            const ctx = drawCanvas.getContext('2d');
+            const ctx = drawCanvas.getContext('2d', { willReadFrequently: true });
             let drawing = false;
             let lastX = 0;
             let lastY = 0;
@@ -284,10 +321,9 @@
                 const rect = drawCanvas.getBoundingClientRect();
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
                 const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                return {
-                    x: clientX - rect.left,
-                    y: clientY - rect.top
-                };
+                const x = clientX - rect.left;
+                const y = clientY - rect.top;
+                return { x, y };
             }
 
             function startDrawing(e) {
@@ -296,11 +332,13 @@
                 const pos = getPos(e);
                 lastX = pos.x;
                 lastY = pos.y;
+                console.log('Start tekenen op:', pos);
             }
 
             function draw(e) {
                 if (!drawing) return;
                 e.preventDefault();
+                
                 const pos = getPos(e);
 
                 ctx.lineCap = 'round';
@@ -327,18 +365,24 @@
 
             function stopDrawing(e) {
                 if (e) e.preventDefault();
+                if (drawing) {
+                    console.log('Stop tekenen');
+                }
                 drawing = false;
             }
 
+            // Mouse events
             drawCanvas.addEventListener('mousedown', startDrawing);
             drawCanvas.addEventListener('mousemove', draw);
             drawCanvas.addEventListener('mouseup', stopDrawing);
             drawCanvas.addEventListener('mouseleave', stopDrawing);
 
-            // Touch support
+            // Touch events
             drawCanvas.addEventListener('touchstart', startDrawing, { passive: false });
             drawCanvas.addEventListener('touchmove', draw, { passive: false });
-            drawCanvas.addEventListener('touchend', stopDrawing);
+            drawCanvas.addEventListener('touchend', stopDrawing, { passive: false });
+
+            console.log('Tekenen geïnitialiseerd! Canvas grootte:', drawCanvas.width, 'x', drawCanvas.height);
         }
 
         // Screenshot maken
@@ -347,34 +391,43 @@
                 const html2canvas = await loadHtml2Canvas();
                 const canvas = await html2canvas(document.body, {
                     scale: 0.7,
-                    logging: false
+                    logging: false,
+                    useCORS: true
                 });
                 baseScreenshotDataUrl = canvas.toDataURL('image/png');
 
                 screenshotImg.src = baseScreenshotDataUrl;
                 screenshotImg.onload = () => {
-                    // Wacht tot image volledig geladen is
-                    const imgWidth = screenshotImg.offsetWidth;
-                    const imgHeight = screenshotImg.offsetHeight;
-                    
-                    // Zet canvas exact over de image
-                    drawCanvas.width = imgWidth;
-                    drawCanvas.height = imgHeight;
-                    drawCanvas.style.width = imgWidth + 'px';
-                    drawCanvas.style.height = imgHeight + 'px';
-                    
-                    screenshotWrapper.style.display = 'block';
-                    
-                    // Clear canvas
-                    const ctx = drawCanvas.getContext('2d');
-                    ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-                    
-                    // Initialiseer tekenen
-                    setupDrawing();
+                    // Wacht even tot de afbeelding volledig gerenderd is
+                    setTimeout(() => {
+                        const rect = screenshotImg.getBoundingClientRect();
+                        const displayWidth = screenshotImg.offsetWidth;
+                        const displayHeight = screenshotImg.offsetHeight;
+                        
+                        console.log('Afbeelding geladen. Display grootte:', displayWidth, 'x', displayHeight);
+                        
+                        // Zet canvas exact over de afbeelding
+                        drawCanvas.width = displayWidth;
+                        drawCanvas.height = displayHeight;
+                        drawCanvas.style.width = displayWidth + 'px';
+                        drawCanvas.style.height = displayHeight + 'px';
+                        
+                        // Clear canvas
+                        const ctx = drawCanvas.getContext('2d');
+                        ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+                        
+                        // Toon preview
+                        screenshotWrapper.style.display = 'block';
+                        
+                        // Initialiseer tekenen
+                        setupDrawing();
+                        
+                        console.log('Canvas ingesteld op:', drawCanvas.width, 'x', drawCanvas.height);
+                    }, 100);
                 };
             } catch (err) {
                 console.error('Fout bij het maken van de screenshot:', err);
-                alert('Kon geen screenshot maken.');
+                alert('Kon geen screenshot maken: ' + err.message);
                 baseScreenshotDataUrl = null;
             }
         }
@@ -408,10 +461,10 @@
         // Knop: maak screenshot
         screenshotBtn.addEventListener('click', async () => {
             screenshotBtn.disabled = true;
-            screenshotBtn.textContent = 'Screenshot maken...';
+            screenshotBtn.textContent = '📸 Screenshot maken...';
             await makeScreenshot();
             screenshotBtn.disabled = false;
-            screenshotBtn.textContent = 'Maak screenshot van pagina';
+            screenshotBtn.textContent = '📸 Maak screenshot van pagina';
         });
 
         // Knop: verstuur feedback
@@ -439,7 +492,7 @@
 
             try {
                 sendBtn.disabled = true;
-                sendBtn.textContent = 'Versturen...';
+                sendBtn.textContent = '📤 Versturen...';
 
                 const response = await fetch(BACKEND_URL, {
                     method: 'POST',
@@ -452,7 +505,6 @@
                 if (response.status === 201) {
                     alert('Bedankt! Feedback succesvol ontvangen door de server.');
                     resetModal();
-                    drawingInitialized = false;
                 } else {
                     const errorData = await response.json().catch(() => ({}));
                     alert(`Fout bij verzenden (${response.status}): ${errorData.msg || 'Serverfout'}`);
@@ -462,7 +514,7 @@
                 alert('Fout: Kon geen verbinding maken met de feedbackserver.');
             } finally {
                 sendBtn.disabled = false;
-                sendBtn.textContent = 'Verstuur Feedback';
+                sendBtn.textContent = '📤 Verstuur Feedback';
             }
         });
     }
