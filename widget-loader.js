@@ -1,9 +1,7 @@
 (function() {
-    // --- Configuratie ---
     const WIDGET_ID = 'mijn-feedback-widget-container';
     const BACKEND_URL = 'http://38.242.144.86:3000/api/v1/feedback';
 
-    // Haal de customerId uit de <script> tag
     const CURRENT_SCRIPT = document.currentScript
         || document.getElementById('widget-feedback-script');
 
@@ -19,14 +17,11 @@
         );
         return;
     }
-
-    // Blokkeer dubbele load
     if (document.getElementById(WIDGET_ID)) {
         console.warn('Feedback Widget is al geladen.');
         return;
     }
 
-    // --- Dynamisch Laden van html2canvas ---
     function loadHtml2Canvas() {
         return new Promise((resolve, reject) => {
             if (window.html2canvas) {
@@ -396,34 +391,34 @@
                 });
                 baseScreenshotDataUrl = canvas.toDataURL('image/png');
 
+                screenshotWrapper.style.display = 'block';
+                
                 screenshotImg.src = baseScreenshotDataUrl;
                 screenshotImg.onload = () => {
-                    // Wacht even tot de afbeelding volledig gerenderd is
-                    setTimeout(() => {
-                        const rect = screenshotImg.getBoundingClientRect();
-                        const displayWidth = screenshotImg.offsetWidth;
-                        const displayHeight = screenshotImg.offsetHeight;
-                        
-                        console.log('Afbeelding geladen. Display grootte:', displayWidth, 'x', displayHeight);
-                        
-                        // Zet canvas exact over de afbeelding
-                        drawCanvas.width = displayWidth;
-                        drawCanvas.height = displayHeight;
-                        drawCanvas.style.width = displayWidth + 'px';
-                        drawCanvas.style.height = displayHeight + 'px';
-                        
-                        // Clear canvas
-                        const ctx = drawCanvas.getContext('2d');
-                        ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-                        
-                        // Toon preview
-                        screenshotWrapper.style.display = 'block';
-                        
-                        // Initialiseer tekenen
-                        setupDrawing();
-                        
-                        console.log('Canvas ingesteld op:', drawCanvas.width, 'x', drawCanvas.height);
-                    }, 100);
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            const displayWidth = screenshotImg.clientWidth;
+                            const displayHeight = screenshotImg.clientHeight;
+                            
+                            console.log('Afbeelding geladen. Display grootte:', displayWidth, 'x', displayHeight);
+                            console.log('Natuurlijke grootte:', screenshotImg.naturalWidth, 'x', screenshotImg.naturalHeight);
+                            
+                            // Zet canvas exact over de afbeelding
+                            drawCanvas.width = displayWidth;
+                            drawCanvas.height = displayHeight;
+                            drawCanvas.style.width = displayWidth + 'px';
+                            drawCanvas.style.height = displayHeight + 'px';
+                            
+                            // Clear canvas
+                            const ctx = drawCanvas.getContext('2d');
+                            ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+                            
+                            // Initialiseer tekenen
+                            setupDrawing();
+                            
+                            console.log('Canvas ingesteld op:', drawCanvas.width, 'x', drawCanvas.height);
+                        });
+                    });
                 };
             } catch (err) {
                 console.error('Fout bij het maken van de screenshot:', err);
