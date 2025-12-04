@@ -17,7 +17,7 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ msg: 'email, password en customerId zijn verplicht.' });
     }
 
-    const existing = await User.findOne({ email }).select('+passwordHash');
+    const existing = await User.findOne({ email });
     if (existing) {
       return res.status(409).json({ msg: 'Email bestaat al.' });
     }
@@ -41,11 +41,13 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ msg: 'email en password zijn verplicht.' });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select('+passwordHash');
+    
     if (!user) {
       return res.status(401).json({ msg: 'Ongeldige inloggegevens.' });
     }
-
+    if (!user) return res.status(401).json({ msg: 'Ongeldige inloggegevens.' });
+    console.log('Hash aanwezig?', !!user.passwordHash);
     const isValid = await user.validatePassword(password);
     if (!isValid) {
       return res.status(401).json({ msg: 'Ongeldige inloggegevens.' });
