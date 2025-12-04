@@ -142,8 +142,7 @@
               </style>
             
               <button id="open-feedback-btn">Geef Feedback</button>
-            
-              <!-- Let op data-html2canvas-ignore -->
+
               <div id="feedback-modal" class="feedback-modal" data-html2canvas-ignore="true">
                 <div class="modal-content">
                   <span class="close-btn">&times;</span>
@@ -259,4 +258,5 @@
     initializeWidget();
 
 })();
+
 
