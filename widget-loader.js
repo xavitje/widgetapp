@@ -2,21 +2,15 @@
     // --- Configuratie ---
     const WIDGET_ID = 'mijn-feedback-widget-container';
 
-    // !!! BELANGRIJK: CONTROLEER DEZE URL !!!
-    // Deze URL verwijst naar jouw Node.js API op poort 3000
     const BACKEND_URL = 'http://38.242.144.86:3000/api/v1/feedback';
 
-    // NIEUW: De unieke ID van de klant die deze code gebruikt
-    // ELKE KLANT DIE DIT SCRIPT KRIJGT MOET EEN UNIEKE ID HEBBEN!
-    const CUSTOMER_ID = 'JOUW_UNIEKE_KLANT_ID_HIER'; 
-    // Voorbeeld: 'klant-huppeldepup-456'
+    const CUSTOMER_ID = 'testsite-001'; 
 
     if (document.getElementById(WIDGET_ID)) {
         console.warn('Feedback Widget is al geladen.');
         return;
     }
 
-    // --- Dynamisch Laden van html2canvas ---
     function loadHtml2Canvas() {
         return new Promise((resolve, reject) => {
             if (window.html2canvas) {
@@ -210,3 +204,4 @@
     initializeWidget();
 
 })();
+
