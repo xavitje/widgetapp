@@ -69,6 +69,24 @@
                 #${WIDGET_ID} button:hover:not(:disabled) {
                     background-color: #2563EB;
                 }
+                #${WIDGET_ID} .feedback-icon-button {
+                    background: transparent;
+                    padding: 0;
+                    border-radius: 999px;
+                    box-shadow: none;
+                    border: none;
+                }
+                #${WIDGET_ID} .feedback-icon-button img {
+                    width: 48px;
+                    height: 48px;
+                    display: block;
+                    border-radius: 999px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+                }
+                #${WIDGET_ID} .feedback-icon-button:hover img {
+                    transform: translateY(-1px);
+                    box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+                }
                 .feedback-modal {
                     display: none;
                     position: fixed;
@@ -191,7 +209,10 @@
                 }
             </style>
 
-            <button id="open-feedback-btn">Geef Feedback</button>
+            <button id="open-feedback-btn" class="feedback-icon-button">
+                <img src="http://38.242.144.86:8088/widget/icon.png" alt="Feedback" />
+            </button>
+
 
             <!-- Popup wordt uitgesloten van screenshot -->
             <div id="feedback-modal" class="feedback-modal" data-html2canvas-ignore="true">
@@ -517,3 +538,4 @@
     // Start de widget
     initializeWidget();
 })();
+
