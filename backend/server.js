@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const feedbackRoutes = require('./routes/feedback');
+const authRoutes = require('./routes/auth');
 const app = express();
 const PORT = 3000
 
@@ -41,6 +42,7 @@ app.use(cors(corsOptions));
 
 // Body-parser om JSON te parsen. Limit is verhoogd voor Base64 screenshots.
 app.use(bodyParser.json({ limit: '10mb' }));
+app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/feedback', feedbackRoutes);
 
 // --- 3. Start de Server ---
