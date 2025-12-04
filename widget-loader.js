@@ -199,58 +199,189 @@
             }
 
             // 1. Maak de screenshot
-            let screenshotDataUrl = null;
-            try {
-                const html2canvas = await loadHtml2Canvas();
-                const canvas = await html2canvas(document.body, { 
-                    scale: 0.5,
-                    logging: false 
-                });
-                screenshotDataUrl = canvas.toDataURL('image/png'); 
-            } catch (err) {
-                console.error('Fout bij het maken van de screenshot:', err);
-                alert('Kon geen screenshot maken. Feedback wordt zonder afbeelding verstuurd.');
-                screenshotDataUrl = null; 
+            const screenshotBtn = document.getElementById('screenshot-btn');
+            const screenshotWrapper = document.getElementById('screenshot-preview-wrapper');
+            const screenshotImg = document.getElementById('screenshot-image');
+            const drawCanvas = document.getElementById('screenshot-draw-canvas');
+            
+            let baseScreenshotDataUrl = null; // originele screenshot
+            let finalScreenshotDataUrl = null; // screenshot + tekeningen
+            
+            function setupDrawing() {
+              const ctx = drawCanvas.getContext('2d');
+              let drawing = false;
+              let lastX = 0;
+              let lastY = 0;
+            
+              function getPos(e) {
+                const rect = drawCanvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return {
+                  x: clientX - rect.left,
+                  y: clientY - rect.top
+                };
+              }
+            
+              function startDrawing(e) {
+                drawing = true;
+                const pos = getPos(e);
+                lastX = pos.x;
+                lastY = pos.y;
+              }
+            
+              function draw(e) {
+                if (!drawing) return;
+                e.preventDefault();
+                const pos = getPos(e);
+                ctx.strokeStyle = '#ff0000';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+            
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+            
+                lastX = pos.x;
+                lastY = pos.y;
+              }
+            
+              function stopDrawing() {
+                drawing = false;
+              }
+            
+              drawCanvas.addEventListener('mousedown', startDrawing);
+              drawCanvas.addEventListener('mousemove', draw);
+              drawCanvas.addEventListener('mouseup', stopDrawing);
+              drawCanvas.addEventListener('mouseleave', stopDrawing);
+            
+              // Touch support
+              drawCanvas.addEventListener('touchstart', startDrawing, { passive: false });
+              drawCanvas.addEventListener('touchmove', draw, { passive: false });
+              drawCanvas.addEventListener('touchend', stopDrawing);
             }
-
-            // 2. Bereid de payload voor
-            const payload = {
+            
+            async function makeScreenshot() {
+              try {
+                const html2canvas = await loadHtml2Canvas();
+                const canvas = await html2canvas(document.body, {
+                  scale: 0.7,
+                  logging: false
+                });
+                baseScreenshotDataUrl = canvas.toDataURL('image/png');
+            
+                // Toon preview en tekenlaag
+                screenshotImg.src = baseScreenshotDataUrl;
+                screenshotImg.onload = () => {
+                  drawCanvas.width = screenshotImg.clientWidth;
+                  drawCanvas.height = screenshotImg.clientHeight;
+                  screenshotWrapper.style.display = 'block';
+                  const ctx = drawCanvas.getContext('2d');
+                  ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+                };
+            
+              } catch (err) {
+                console.error('Fout bij het maken van de screenshot:', err);
+                alert('Kon geen screenshot maken.');
+                baseScreenshotDataUrl = null;
+              }
+            }
+            
+            function mergeScreenshotAndDrawing() {
+              if (!baseScreenshotDataUrl) return null;
+            
+              const img = new Image();
+              return new Promise((resolve) => {
+                img.onload = () => {
+                  const finalCanvas = document.createElement('canvas');
+                  finalCanvas.width = img.width;
+                  finalCanvas.height = img.height;
+                  const ctx = finalCanvas.getContext('2d');
+            
+                  // Teken basis screenshot
+                  ctx.drawImage(img, 0, 0, img.width, img.height);
+            
+                  // Schaal teken-canvas naar dezelfde resolutie
+                  if (drawCanvas.width > 0 && drawCanvas.height > 0) {
+                    ctx.drawImage(drawCanvas, 0, 0, img.width, img.height);
+                  }
+            
+                  resolve(finalCanvas.toDataURL('image/png'));
+                };
+                img.src = baseScreenshotDataUrl;
+              });
+            }
+            
+            // Knop: maak screenshot
+            screenshotBtn.addEventListener('click', async () => {
+              await makeScreenshot();
+              if (drawCanvas && !drawCanvas.dataset._init) {
+                setupDrawing();
+                drawCanvas.dataset._init = '1';
+              }
+            });
+            
+            // Knop: verstuur feedback
+            sendBtn.addEventListener('click', async () => {
+              const feedbackText = feedbackTextarea.value.trim();
+              if (!feedbackText) {
+                alert('Voer eerst een bericht in.');
+                return;
+              }
+            
+              // Screenshot samenvoegen met tekening (als er een is)
+              if (baseScreenshotDataUrl) {
+                finalScreenshotDataUrl = await mergeScreenshotAndDrawing();
+              } else {
+                finalScreenshotDataUrl = null;
+              }
+            
+              const payload = {
                 message: feedbackText,
-                screenshot: screenshotDataUrl,
+                screenshot: finalScreenshotDataUrl,
                 url: window.location.href,
                 userAgent: navigator.userAgent,
                 timestamp: new Date().toISOString(),
                 customerId: CUSTOMER_ID
-            };
-
-            // 3. API Call naar de Node.js Backend
-            try {
+              };
+            
+              try {
                 sendBtn.disabled = true;
                 sendBtn.textContent = 'Versturen...';
-
+            
                 const response = await fetch(BACKEND_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(payload)
                 });
-
+            
                 if (response.status === 201) {
-                    alert('Bedankt! Feedback succesvol ontvangen door de server.');
-                    resetModal();
+                  alert('Bedankt! Feedback succesvol ontvangen door de server.');
+                  // reset
+                  baseScreenshotDataUrl = null;
+                  finalScreenshotDataUrl = null;
+                  screenshotWrapper.style.display = 'none';
+                  if (drawCanvas) {
+                    const ctx = drawCanvas.getContext('2d');
+                    ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+                  }
+                  feedbackTextarea.value = '';
+                  modal.style.display = 'none';
                 } else {
-                    const errorData = await response.json().catch(() => ({}));
-                    alert(`Fout bij verzenden (${response.status}): ${errorData.msg || 'Serverfout'}`);
+                  const errorData = await response.json().catch(() => ({}));
+                  alert(`Fout bij verzenden (${response.status}): ${errorData.msg || 'Serverfout'}`);
                 }
-
-            } catch (error) {
+            
+              } catch (error) {
                 console.error('Netwerkfout bij verzenden:', error);
-                alert('Fout: Kon geen verbinding maken met de feedbackserver. Controleer de API-URL en CORS.');
-            } finally {
+                alert('Fout: Kon geen verbinding maken met de feedbackserver.');
+              } finally {
                 sendBtn.disabled = false;
                 sendBtn.textContent = 'Verstuur Feedback';
-            }
+              }
         });
     }
 
@@ -258,5 +389,6 @@
     initializeWidget();
 
 })();
+
 
 
