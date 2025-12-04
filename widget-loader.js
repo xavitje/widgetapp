@@ -1,0 +1,212 @@
+(function() {
+    // --- Configuratie ---
+    const WIDGET_ID = 'mijn-feedback-widget-container';
+
+    // !!! BELANGRIJK: CONTROLEER DEZE URL !!!
+    // Deze URL verwijst naar jouw Node.js API op poort 3000
+    const BACKEND_URL = 'http://38.242.144.86:3000/api/v1/feedback';
+
+    // NIEUW: De unieke ID van de klant die deze code gebruikt
+    // ELKE KLANT DIE DIT SCRIPT KRIJGT MOET EEN UNIEKE ID HEBBEN!
+    const CUSTOMER_ID = 'JOUW_UNIEKE_KLANT_ID_HIER'; 
+    // Voorbeeld: 'klant-huppeldepup-456'
+
+    if (document.getElementById(WIDGET_ID)) {
+        console.warn('Feedback Widget is al geladen.');
+        return;
+    }
+
+    // --- Dynamisch Laden van html2canvas ---
+    function loadHtml2Canvas() {
+        return new Promise((resolve, reject) => {
+            if (window.html2canvas) {
+                resolve(window.html2canvas);
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+            script.onload = () => resolve(window.html2canvas);
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
+    // --- Core Widget Logica ---
+    function initializeWidget() {
+        const widgetContainer = document.createElement('div');
+        widgetContainer.id = WIDGET_ID;
+        document.body.appendChild(widgetContainer);
+
+        // Basis HTML/CSS voor de widget
+        widgetContainer.innerHTML = `
+            <style>
+                #${WIDGET_ID} {
+                    position: fixed;
+                    right: 20px;
+                    bottom: 20px;
+                    z-index: 10000;
+                    font-family: Arial, sans-serif;
+                }
+                #${WIDGET_ID} button {
+                    background-color: #3B82F6;
+                    color: white;
+                    border: none;
+                    padding: 10px 15px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                }
+                .feedback-modal {
+                    display: none;
+                    position: fixed;
+                    z-index: 10001;
+                    left: 0;
+                    top: 0;
+                    width: 100%;
+                    height: 100%;
+                    overflow: auto;
+                    background-color: rgba(0,0,0,0.4);
+                    padding-top: 60px;
+                }
+                .modal-content {
+                    background-color: #fefefe;
+                    margin: 5% auto;
+                    padding: 20px;
+                    border: 1px solid #888;
+                    width: 80%;
+                    max-width: 500px;
+                    border-radius: 8px;
+                    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                    position: relative;
+                }
+                .close-btn {
+                    color: #aaa;
+                    float: right;
+                    font-size: 28px;
+                    font-weight: bold;
+                    cursor: pointer;
+                }
+                textarea {
+                    width: 100%;
+                    min-height: 100px;
+                    padding: 10px;
+                    margin-top: 10px;
+                    border: 1px solid #ccc;
+                    box-sizing: border-box;
+                    border-radius: 4px;
+                }
+                #send-feedback-btn {
+                    margin-top: 15px;
+                    width: 100%;
+                }
+            </style>
+            <button id="open-feedback-btn">Geef Feedback</button>
+
+            <div id="feedback-modal" class="feedback-modal">
+                <div class="modal-content">
+                    <span class="close-btn">&times;</span>
+                    <h2>Geef je Feedback</h2>
+                    <p>Beschrijf het probleem of suggestie. Er wordt automatisch een screenshot van de huidige pagina gemaakt.</p>
+                    <textarea id="feedback-text" placeholder="Typ hier je opmerking..."></textarea>
+                    <button id="send-feedback-btn">Verstuur Feedback</button>
+                </div>
+            </div>
+        `;
+
+        const openBtn = document.getElementById('open-feedback-btn');
+        const modal = document.getElementById('feedback-modal');
+        const closeBtn = document.querySelector('.close-btn');
+        const sendBtn = document.getElementById('send-feedback-btn');
+        const feedbackTextarea = document.getElementById('feedback-text');
+
+        openBtn.onclick = () => {
+            modal.style.display = 'block';
+        };
+
+        closeBtn.onclick = () => {
+            modal.style.display = 'none';
+        };
+
+        window.onclick = (event) => {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        };
+
+        function resetModal() {
+            feedbackTextarea.value = '';
+            modal.style.display = 'none';
+        }
+
+        sendBtn.addEventListener('click', async () => {
+            const feedbackText = feedbackTextarea.value.trim();
+            if (!feedbackText) {
+                alert('Voer eerst een bericht in.');
+                return;
+            }
+
+            // 1. Maak de screenshot
+            let screenshotDataUrl = null;
+            try {
+                const html2canvas = await loadHtml2Canvas();
+                const canvas = await html2canvas(document.body, { 
+                    scale: 0.5, // Verlaag de schaal voor kleinere, snellere uploads
+                    logging: false 
+                });
+                screenshotDataUrl = canvas.toDataURL('image/png'); 
+
+            } catch (err) {
+                console.error('Fout bij het maken van de screenshot:', err);
+                alert('Kon geen screenshot maken. Feedback wordt zonder afbeelding verstuurd.');
+                // Zet de data op null, zodat de API deze overslaat
+                screenshotDataUrl = null; 
+            }
+
+            // 2. Bereid de payload voor
+            const payload = {
+                message: feedbackText,
+                screenshot: screenshotDataUrl,
+                url: window.location.href,
+                userAgent: navigator.userAgent,
+                timestamp: new Date().toISOString(),
+                // NIEUW: De verplichte klant ID voor isolatie
+                customerId: CUSTOMER_ID
+            };
+
+            // 3. API Call naar de Node.js Backend
+            try {
+                sendBtn.disabled = true;
+                sendBtn.textContent = 'Versturen...';
+
+                const response = await fetch(BACKEND_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.status === 201) {
+                    alert('Bedankt! Feedback succesvol ontvangen door de server.');
+                    resetModal();
+                } else {
+                    // Handelt server-side fouten af (bijv. 400 Bad Request)
+                    const errorData = await response.json();
+                    alert(`Fout bij verzenden (${response.status}): ${errorData.msg || 'Serverfout'}`);
+                }
+
+            } catch (error) {
+                // Handelt netwerkfouten af (bijv. server is offline, CORS-probleem)
+                console.error('Netwerkfout bij verzenden:', error);
+                alert('Fout: Kon geen verbinding maken met de feedbackserver. Controleer de API-URL en CORS.');
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Verstuur Feedback';
+            }
+        });
+    }
+
+    // Start de initialisatie
+    initializeWidget();
+
+})();
