@@ -1,11 +1,3 @@
-Hier is je `widget-loader.js` volledig, met:
-
-- Fix zodat tekenen werkt (canvas echt boven de image + image vangt geen events).  
-- Tool selector “Potlood / Gum”:  
-  - Potlood = rood tekenen.  
-  - Gum = wissen met witte “borstel” (je gumt alleen je tekening, niet de onderliggende screenshot).
-
-```js
 (function() {
     // --- Configuratie ---
     const WIDGET_ID = 'mijn-feedback-widget-container';
@@ -465,5 +457,4 @@ Hier is je `widget-loader.js` volledig, met:
 
     // Start de widget
     initializeWidget();
-
 })();
