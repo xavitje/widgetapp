@@ -1,16 +1,14 @@
 
-// routes/auth.js
+
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 const router = express.Router();
 
-// In productie in .env zetten
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-change-me';
 const JWT_EXPIRES_IN = '7d';
 
-// OPTIONAL: simpele register route om een user aan te maken
 router.post('/register', async (req, res) => {
   try {
     const { email, password, customerId, role } = req.body;
@@ -19,7 +17,7 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ msg: 'email, password en customerId zijn verplicht.' });
     }
 
-    const existing = await User.findOne({ email });
+    const existing = await User.findOne({ email }).select('+passwordHash');
     if (existing) {
       return res.status(409).json({ msg: 'Email bestaat al.' });
     }
@@ -35,7 +33,6 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// LOGIN: geeft JWT terug
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
