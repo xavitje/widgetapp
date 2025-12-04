@@ -4,7 +4,22 @@
 
     const BACKEND_URL = 'http://38.242.144.86:3000/api/v1/feedback';
 
-    const CUSTOMER_ID = 'testsite-001'; 
+    // Haal de customerId uit de <script> tag
+    const CURRENT_SCRIPT = document.currentScript
+        || document.getElementById('widget-feedback-script');
+
+    const CUSTOMER_ID = CURRENT_SCRIPT
+        ? CURRENT_SCRIPT.getAttribute('data-customer-id')
+        : null;
+
+    if (!CUSTOMER_ID) {
+        console.error(
+            'Feedback widget: data-customer-id ontbreekt. ' +
+            'Gebruik bijvoorbeeld: ' +
+            "<script id=\"widget-feedback-script\" src=\".../widget-loader.js\" data-customer-id=\"jouw-id\" async></script>"
+        );
+        return;
+    }
 
     if (document.getElementById(WIDGET_ID)) {
         console.warn('Feedback Widget is al geladen.');
@@ -144,15 +159,13 @@
             try {
                 const html2canvas = await loadHtml2Canvas();
                 const canvas = await html2canvas(document.body, { 
-                    scale: 0.5, // Verlaag de schaal voor kleinere, snellere uploads
+                    scale: 0.5,
                     logging: false 
                 });
                 screenshotDataUrl = canvas.toDataURL('image/png'); 
-
             } catch (err) {
                 console.error('Fout bij het maken van de screenshot:', err);
                 alert('Kon geen screenshot maken. Feedback wordt zonder afbeelding verstuurd.');
-                // Zet de data op null, zodat de API deze overslaat
                 screenshotDataUrl = null; 
             }
 
@@ -163,7 +176,6 @@
                 url: window.location.href,
                 userAgent: navigator.userAgent,
                 timestamp: new Date().toISOString(),
-                // NIEUW: De verplichte klant ID voor isolatie
                 customerId: CUSTOMER_ID
             };
 
@@ -184,13 +196,11 @@
                     alert('Bedankt! Feedback succesvol ontvangen door de server.');
                     resetModal();
                 } else {
-                    // Handelt server-side fouten af (bijv. 400 Bad Request)
-                    const errorData = await response.json();
+                    const errorData = await response.json().catch(() => ({}));
                     alert(`Fout bij verzenden (${response.status}): ${errorData.msg || 'Serverfout'}`);
                 }
 
             } catch (error) {
-                // Handelt netwerkfouten af (bijv. server is offline, CORS-probleem)
                 console.error('Netwerkfout bij verzenden:', error);
                 alert('Fout: Kon geen verbinding maken met de feedbackserver. Controleer de API-URL en CORS.');
             } finally {
@@ -204,4 +214,3 @@
     initializeWidget();
 
 })();
-
