@@ -50,78 +50,123 @@
         widgetContainer.innerHTML = `
             <style>
                 #${WIDGET_ID} {
-                    position: fixed;
-                    right: 20px;
-                    bottom: 20px;
-                    z-index: 10000;
-                    font-family: Arial, sans-serif;
+                  position: fixed;
+                  right: 20px;
+                  bottom: 20px;
+                  z-index: 10000;
+                  font-family: Arial, sans-serif;
                 }
                 #${WIDGET_ID} button {
-                    background-color: #3B82F6;
-                    color: white;
-                    border: none;
-                    padding: 10px 15px;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                  background-color: #3B82F6;
+                  color: white;
+                  border: none;
+                  padding: 10px 15px;
+                  border-radius: 5px;
+                  cursor: pointer;
+                  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
                 }
                 .feedback-modal {
-                    display: none;
-                    position: fixed;
-                    z-index: 10001;
-                    left: 0;
-                    top: 0;
-                    width: 100%;
-                    height: 100%;
-                    overflow: auto;
-                    background-color: rgba(0,0,0,0.4);
-                    padding-top: 60px;
+                  display: none;
+                  position: fixed;
+                  z-index: 10001;
+                  left: 0;
+                  top: 0;
+                  width: 100%;
+                  height: 100%;
+                  overflow: auto;
+                  background-color: rgba(0,0,0,0.4);
+                  padding-top: 60px;
                 }
                 .modal-content {
-                    background-color: #fefefe;
-                    margin: 5% auto;
-                    padding: 20px;
-                    border: 1px solid #888;
-                    width: 80%;
-                    max-width: 500px;
-                    border-radius: 8px;
-                    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-                    position: relative;
+                  background-color: #fefefe;
+                  margin: 5% auto;
+                  padding: 20px;
+                  border: 1px solid #888;
+                  width: 80%;
+                  max-width: 600px;
+                  border-radius: 8px;
+                  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                  position: relative;
+                  font-family: Arial, sans-serif;
                 }
                 .close-btn {
-                    color: #aaa;
-                    float: right;
-                    font-size: 28px;
-                    font-weight: bold;
-                    cursor: pointer;
+                  color: #aaa;
+                  float: right;
+                  font-size: 28px;
+                  font-weight: bold;
+                  cursor: pointer;
                 }
                 textarea {
-                    width: 100%;
-                    min-height: 100px;
-                    padding: 10px;
-                    margin-top: 10px;
-                    border: 1px solid #ccc;
-                    box-sizing: border-box;
-                    border-radius: 4px;
+                  width: 100%;
+                  min-height: 100px;
+                  padding: 10px;
+                  margin-top: 10px;
+                  border: 1px solid #ccc;
+                  box-sizing: border-box;
+                  border-radius: 4px;
                 }
+                #screenshot-btn,
                 #send-feedback-btn {
-                    margin-top: 15px;
-                    width: 100%;
+                  margin-top: 10px;
+                  width: 100%;
                 }
-            </style>
-            <button id="open-feedback-btn">Geef Feedback</button>
-
-            <div id="feedback-modal" class="feedback-modal">
+                #screenshot-preview-wrapper {
+                  margin-top: 15px;
+                  border: 1px solid #ddd;
+                  border-radius: 4px;
+                  padding: 8px;
+                  max-height: 350px;
+                  overflow: auto;
+                  display: none;
+                }
+                #screenshot-preview-container {
+                  position: relative;
+                  display: inline-block;
+                  max-width: 100%;
+                }
+                #screenshot-image {
+                  max-width: 100%;
+                  display: block;
+                }
+                #screenshot-draw-canvas {
+                  position: absolute;
+                  left: 0;
+                  top: 0;
+                  cursor: crosshair;
+                }
+                .hint-text {
+                  font-size: 12px;
+                  color: #555;
+                  margin-top: 4px;
+                }
+              </style>
+            
+              <button id="open-feedback-btn">Geef Feedback</button>
+            
+              <!-- Let op data-html2canvas-ignore -->
+              <div id="feedback-modal" class="feedback-modal" data-html2canvas-ignore="true">
                 <div class="modal-content">
-                    <span class="close-btn">&times;</span>
-                    <h2>Geef je Feedback</h2>
-                    <p>Beschrijf het probleem of suggestie. Er wordt automatisch een screenshot van de huidige pagina gemaakt.</p>
-                    <textarea id="feedback-text" placeholder="Typ hier je opmerking..."></textarea>
-                    <button id="send-feedback-btn">Verstuur Feedback</button>
+                  <span class="close-btn">&times;</span>
+                  <h2>Geef je Feedback</h2>
+                  <p>Beschrijf het probleem of suggestie. Je kunt optioneel een screenshot maken en daarop tekenen.</p>
+            
+                  <textarea id="feedback-text" placeholder="Typ hier je opmerking..."></textarea>
+            
+                  <button id="screenshot-btn" type="button">Maak screenshot van pagina</button>
+                  <div class="hint-text">De screenshot bevat de pagina zonder dit venster.</div>
+            
+                  <div id="screenshot-preview-wrapper">
+                    <div class="hint-text">Teken op de screenshot om extra aan te geven wat belangrijk is.</div>
+                    <div id="screenshot-preview-container">
+                      <img id="screenshot-image" alt="Screenshot preview" />
+                      <canvas id="screenshot-draw-canvas"></canvas>
+                    </div>
+                  </div>
+            
+                  <button id="send-feedback-btn" type="button">Verstuur Feedback</button>
                 </div>
-            </div>
+              </div>
         `;
-
         const openBtn = document.getElementById('open-feedback-btn');
         const modal = document.getElementById('feedback-modal');
         const closeBtn = document.querySelector('.close-btn');
@@ -214,3 +259,4 @@
     initializeWidget();
 
 })();
+
