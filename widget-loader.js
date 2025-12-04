@@ -1,3 +1,11 @@
+Hier is je `widget-loader.js` volledig, met:
+
+- Fix zodat tekenen werkt (canvas echt boven de image + image vangt geen events).  
+- Tool selector “Potlood / Gum”:  
+  - Potlood = rood tekenen.  
+  - Gum = wissen met witte “borstel” (je gumt alleen je tekening, niet de onderliggende screenshot).
+
+```js
 (function() {
     // --- Configuratie ---
     const WIDGET_ID = 'mijn-feedback-widget-container';
@@ -139,17 +147,38 @@
                 #screenshot-image {
                     max-width: 100%;
                     display: block;
+                    pointer-events: none; /* alle input naar canvas */
                 }
                 #screenshot-draw-canvas {
                     position: absolute;
                     left: 0;
                     top: 0;
                     cursor: crosshair;
+                    z-index: 2; /* boven de image */
                 }
                 .hint-text {
                     font-size: 12px;
                     color: #555;
                     margin-top: 4px;
+                }
+                .tool-selector {
+                    margin-top: 8px;
+                    display: flex;
+                    gap: 8px;
+                    align-items: center;
+                    font-size: 12px;
+                    color: #333;
+                }
+                .tool-selector button {
+                    background-color: #e5e7eb;
+                    color: #111827;
+                    padding: 4px 10px;
+                    font-size: 12px;
+                    box-shadow: none;
+                }
+                .tool-selector button.active {
+                    background-color: #3B82F6;
+                    color: #ffffff;
                 }
             </style>
 
@@ -168,6 +197,11 @@
                     <div class="hint-text">De screenshot bevat de pagina zonder dit venster.</div>
 
                     <div id="screenshot-preview-wrapper">
+                        <div class="tool-selector">
+                            <span>Tekentool:</span>
+                            <button id="tool-pencil" type="button" class="active">Potlood</button>
+                            <button id="tool-eraser" type="button">Gum</button>
+                        </div>
                         <div class="hint-text">
                             Teken op de screenshot om extra aan te geven wat belangrijk is.
                         </div>
@@ -193,10 +227,14 @@
         const screenshotImg = document.getElementById('screenshot-image');
         const drawCanvas = document.getElementById('screenshot-draw-canvas');
 
+        const toolPencilBtn = document.getElementById('tool-pencil');
+        const toolEraserBtn = document.getElementById('tool-eraser');
+
+        let currentTool = 'pencil'; // 'pencil' of 'eraser'
         let baseScreenshotDataUrl = null;   // originele screenshot
         let finalScreenshotDataUrl = null;  // screenshot + tekeningen
 
-        // Popup openen/sluiten
+        // popup open/close
         openBtn.onclick = () => {
             modal.style.display = 'block';
         };
@@ -222,6 +260,21 @@
                 ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
             }
         }
+
+        // tool switch
+        function setTool(tool) {
+            currentTool = tool;
+            if (tool === 'pencil') {
+                toolPencilBtn.classList.add('active');
+                toolEraserBtn.classList.remove('active');
+            } else {
+                toolEraserBtn.classList.add('active');
+                toolPencilBtn.classList.remove('active');
+            }
+        }
+
+        toolPencilBtn.addEventListener('click', () => setTool('pencil'));
+        toolEraserBtn.addEventListener('click', () => setTool('eraser'));
 
         // Tekenen op de canvas
         function setupDrawing() {
@@ -252,9 +305,18 @@
                 if (!drawing) return;
                 e.preventDefault();
                 const pos = getPos(e);
-                ctx.strokeStyle = '#ff0000';
-                ctx.lineWidth = 3;
+
                 ctx.lineCap = 'round';
+
+                if (currentTool === 'pencil') {
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.strokeStyle = '#ff0000';
+                    ctx.lineWidth = 3;
+                } else if (currentTool === 'eraser') {
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.strokeStyle = 'rgba(0,0,0,1)';
+                    ctx.lineWidth = 10;
+                }
 
                 ctx.beginPath();
                 ctx.moveTo(lastX, lastY);
@@ -265,7 +327,8 @@
                 lastY = pos.y;
             }
 
-            function stopDrawing() {
+            function stopDrawing(e) {
+                if (e) e.preventDefault();
                 drawing = false;
             }
 
@@ -278,6 +341,10 @@
             drawCanvas.addEventListener('touchstart', startDrawing, { passive: false });
             drawCanvas.addEventListener('touchmove', draw, { passive: false });
             drawCanvas.addEventListener('touchend', stopDrawing);
+
+            // Zorg dat image niet gesleept wordt
+            screenshotImg.addEventListener('dragstart', (e) => e.preventDefault());
+            screenshotImg.addEventListener('mousedown', (e) => e.preventDefault());
         }
 
         // Screenshot maken (zonder popup)
